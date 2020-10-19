@@ -1,0 +1,19 @@
+[package]
+name = "bittorrent"
+version = "0.1.0"
+authors = ["Rodrigo Valle <rdan.valle@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "tracker"
+path = "src/tracker.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_bencode = "0.2"
+serde_urlencoded = "0.7"
+structopt = "0.3"
+hyper = "0.13"
+tokio = { version = "0.3", features = ["macros", "rt-multi-thread"] }
