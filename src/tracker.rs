@@ -36,6 +36,8 @@ async fn main() {
         Ok::<_, Infallible>(service_fn(handle))
     });
 
+    // TODO: Generate a .torrent metainfo file
+
     // bind and accept new connections
     let server = Server::bind(&addr).serve(make_service);
 
