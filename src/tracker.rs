@@ -1,4 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr};
+use crate::Opt;
+
+use std::net::IpAddr;
+use std::sync::Arc;
 use hyper::{Body, Method, Request};
 use serde::{Serialize, Deserialize};
 use serde_urlencoded;
@@ -15,7 +18,13 @@ pub struct TrackerResponse {
 
 #[derive(Debug, Serialize)]
 pub struct TrackerError {
-    failure: &'static str,
+    failure: String,
+}
+
+impl TrackerError {
+    fn new(msg: String) -> Self {
+        Self { failure: msg }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -61,6 +70,23 @@ struct TrackerRequest<'a> {
     numwant: Option<u32>,
 }
 
+impl<'a> TrackerRequest<'a> {
+    fn from_query_string<'b: 'a>(qs: &'b str) -> Result<Self, TrackerError> {
+        serde_urlencoded::from_str(qs).map_err(|err| {
+            TrackerError::new(err.to_string())
+        })
+    }
+
+    fn validate_request(&self) -> Result<(), TrackerError> {
+        let ret = match (self.info_hash.len(), self.peer_id.len()) {
+            (20, 20) => Ok(()),
+            (20, _) => Err("Invalid peerid: peerid is not 20 bytes long."),
+            (_, _) => Err("Invalid infohash: infohash is not 20 bytes long."),
+        };
+        ret.map_err(|s: &str| TrackerError::new(s.to_string()))
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum ClientEvent {
@@ -72,36 +98,40 @@ enum ClientEvent {
     Completed,
 }
 
-fn validate_request(req: &TrackerRequest) -> Result<(), TrackerError> {
-    match (req.info_hash.len(), req.peer_id.len()) {
-        (20, 20) => Ok(()),
-        _ => Err(TrackerError { failure: "info_hash or peer_id not of length 20" }),
-    }
-}
+pub struct Tracker;
 
-pub fn handle_session(req: Request<Body>) -> TrackerResult {
-    let uri = req.uri();
-    match (req.method(), uri.path(), uri.query()) {
-        (&Method::GET, path, Some(query)) => {
-            let qs: TrackerRequest = serde_urlencoded::from_str(query).unwrap();
-            validate_request(&qs)?;
-            println!("{:?}  {:?}", path, qs);
-            Ok(TrackerResponse {
-                interval: 10,
-                peers: vec![],
-            })
-        },
-        _ => {
-            Err(TrackerError {
-                failure: "Expected a GET request with a path and a query string",
-            })
-        }
+impl Tracker {
+    fn register_new_peer(req: &TrackerRequest) {
+    }
+
+    pub fn handle_session(req: Request<Body>, _opt: Arc<Opt>) -> TrackerResult {
+        let uri = req.uri();
+        let ret = match (req.method(), uri.path(), uri.query()) {
+            (&Method::GET, "/announce", Some(query)) => {
+                let qs = TrackerRequest::from_query_string(query)?;
+                qs.validate_request()?;
+                match qs.event {
+                    Some(ClientEvent::Started) => Tracker::register_new_peer(&qs),
+                    Some(ClientEvent::Stopped) => unimplemented!(),
+                    Some(ClientEvent::Completed) => unimplemented!(),
+                    None => unimplemented!(),
+                }
+                unimplemented!();
+            },
+            (&Method::GET, "/announce", None) => Err("Invalid request: no query string."),
+            (&Method::GET, _, _) => Err("Unrecognized path, try '/announce'."),
+            _ => Err("Invalid request type: client request was not an HTTP GET."),
+        };
+
+        ret.map_err(|s: &str| TrackerError::new(s.to_string()))
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::net::Ipv4Addr;
+    use std::path::PathBuf;
     use serde_bencode;
 
     #[test]
@@ -125,7 +155,7 @@ mod test {
     #[test]
     fn basic_err_test() {
         let err = TrackerError {
-            failure: "oops",
+            failure: "oops".to_string(),
         };
 
         assert_eq!(
@@ -139,7 +169,11 @@ mod test {
         // TODO: flesh this out
         let mut req = Request::builder()
             .uri("http://localhost:6981?info_hash=abcdefghijklmnopqrst&peer_id=abcdefghijklmnopqrst&ip=192.168.0.1&port=1000&uploaded=42&downloaded=10&left=20");
+        let opt = Arc::new(Opt {
+            root: PathBuf::new(),
+            peers: 10,
+        });
 
-        handle_session(req.body(Body::empty()).unwrap());
+        Tracker::handle_session(req.body(Body::empty()).unwrap(), opt);
     }
 }
