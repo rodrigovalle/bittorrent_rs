@@ -1,6 +1,6 @@
 //! Bittorrent tracker
 mod metainfo;
-mod session;
+mod tracker;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -23,7 +23,7 @@ struct Opt {
 }
 
 async fn handle(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    let resp = session::handle_session(req);
+    let resp = tracker::handle_session(req);
     Ok(Response::new(Body::from(serde_bencode::to_string(&resp).unwrap())))
 }
 
