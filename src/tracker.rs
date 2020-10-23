@@ -3,12 +3,12 @@ use crate::Opt;
 use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
 use serde_urlencoded;
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 use std::convert::TryInto;
+use std::net::IpAddr;
 use std::str;
+use std::sync::{Arc, Mutex};
 
 pub type TrackerResult = Result<TrackerResponse, TrackerError>;
 
@@ -116,8 +116,8 @@ impl Tracker {
     fn register_new_peer(&self, req: &TrackerRequest) {
         let mut torrents = self.torrents.lock().unwrap();
         let peer = Peer {
-            peer_id: str::from_utf8(req.peer_id).unwrap().to_string(),  // gross
-            ip: PeerAddress::Ip(req.ip.unwrap()),  // TODO: this unwrap is bad
+            peer_id: str::from_utf8(req.peer_id).unwrap().to_string(), // gross
+            ip: PeerAddress::Ip(req.ip.unwrap()),                      // TODO: this unwrap is bad
             port: req.port,
         };
 
