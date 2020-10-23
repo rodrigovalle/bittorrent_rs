@@ -8,9 +8,9 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use structopt::StructOpt;
-use hyper::{Body, Request, Response, Server};
 use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server};
+use structopt::StructOpt;
 
 use serde_bencode;
 
@@ -30,8 +30,9 @@ pub struct Opt {
 
 #[tokio::main]
 async fn main() {
-    let opt = Arc::new(Opt::from_args());
+    let opt = Opt::from_args();
     let addr = SocketAddr::from((ADDR, PORT));
+    let tracker = Arc::new(Tracker::new(opt));
 
     // futures have to have 'static lifetimes, so they can only hold references to things owned
     // by the future itself
@@ -52,7 +53,7 @@ async fn main() {
         // we can't just move opt into this closure because we move opt into a brand new nested
         // closure that is constructed every time a new connection appears. calling this closure
         // more than once would mean we move at least twice.
-        let opt = opt.clone();
+        let tracker = tracker.clone();
 
         async {
             // this same closure object created here gets called for every request on a single
@@ -64,10 +65,13 @@ async fn main() {
                 // we need to clone this a second time so that the async block below can own its
                 // own copy, otherwise we "leak" a reference to a local of this closure by returning
                 // it in the future created by async.
-                let opt = opt.clone();
-                async {
-                    let response = Tracker::handle_session(req, opt);
-                    Ok::<_, Infallible>(Response::new(Body::from(serde_bencode::to_string(&response).unwrap())))
+                let tracker = tracker.clone();
+
+                async move {
+                    let response = tracker.handle_session(req);
+                    Ok::<_, Infallible>(Response::new(Body::from(
+                        serde_bencode::to_string(&response).unwrap(),
+                    )))
                 }
             }))
         }

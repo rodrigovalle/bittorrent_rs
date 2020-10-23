@@ -31,7 +31,7 @@ pub enum InfoInner<'a> {
         // length of the file in bytes
         length: u64,
         // md5sum of the file
-        md5sum: Option<&'a [u8; 32]>
+        md5sum: Option<&'a [u8; 32]>,
     },
     MultipleFile {
         // directory name
